@@ -16,9 +16,12 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Verify JWT token without loading Prisma — edge-compatible
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
+  // Check for NextAuth session cookie (handles both dev and secure prod cookies)
+  const hasSessionToken = req.cookies.getAll().some(
+    (c) => c.name.endsWith("authjs.session-token") || c.name.endsWith("next-auth.session-token")
+  );
+
+  if (!hasSessionToken) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
