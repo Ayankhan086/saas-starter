@@ -1,0 +1,122 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+  tasksAsAssignee Task[] @relation("Assignee")
+  tasksAsCreator  Task[] @relation("Creator")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  memberships  Membership[]
+  workspaces   Workspace[]
+  subscription Subscription?
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  orgId     String
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@unique([userId, orgId])
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  orgId     String
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@index([orgId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  workspaceId String
+  assigneeId  String?
+  creatorId   String
+  createdAt   DateTime   @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignee  User?     @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator   User      @relation("Creator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  orgId                String    @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               SubStatus @default(ACTIVE)
+  plan                 Plan      @default(FREE)
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
