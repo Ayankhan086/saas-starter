@@ -8,18 +8,30 @@ export const metadata = {
   title: "Billing | TeamSpace",
 };
 
-export default async function BillingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; canceled?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.orgId) {
     redirect("/login");
   }
 
+  const resolvedParams = await searchParams;
+  const isSuccessRedirect = resolvedParams.success === "true";
+
   const subscription = await prisma.subscription.findUnique({
     where: { orgId: session.user.orgId },
   });
 
-  const plan = subscription?.plan ?? "FREE";
-  const status = subscription?.status ?? "ACTIVE";
+  // If the DB hasn't caught up to the webhook yet, but we know they just succeeded,
+  // visually override the plan so they don't see "Free" immediately after paying.
+  const dbPlan = subscription?.plan ?? "FREE";
+  const plan = isSuccessRedirect ? "PRO" : dbPlan;
+  const status = isSuccessRedirect ? "ACTIVE" : subscription?.status ?? "ACTIVE";
   const limits = PLANS[plan as keyof typeof PLANS];
 
   // Get current usage
